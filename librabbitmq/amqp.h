@@ -396,6 +396,8 @@ RABBITMQ_EXPORT int amqp_encode_table(amqp_bytes_t encoded,
                                       amqp_table_t *input,
                                       size_t *offset);
 
+RABBITMQ_EXPORT int amqp_socket_set_read_timeout(int sock, int timeout_msec);
+RABBITMQ_EXPORT int amqp_socket_set_write_timeout(int sock, int timeout_msec);
 #ifdef __cplusplus
 }
 #endif

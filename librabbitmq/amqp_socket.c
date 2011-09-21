@@ -45,7 +45,8 @@
 #include <poll.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include <sys/time.h>
+#include <sys/socket.h>
 
 #include "amqp.h"
 #include "amqp_framing.h"
@@ -613,4 +614,24 @@ amqp_rpc_reply_t amqp_login(amqp_connection_state_t state,
   result.reply.decoded = NULL;
   result.library_error = 0;
   return result;
+}
+
+int amqp_socket_set_read_timeout(int sock, int timeout_msec)
+{
+	struct timeval tv;
+
+	tv.tv_sec = timeout_msec/1000;
+	tv.tv_usec = ((timeout_msec - (tv.tv_sec * 1000)) * 1000) % 1000000;
+
+	return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv, sizeof(tv));
+}
+
+int amqp_socket_set_write_timeout(int sock, int timeout_msec)
+{
+	struct timeval tv;
+
+	tv.tv_sec = timeout_msec/1000;
+	tv.tv_usec = ((timeout_msec - (tv.tv_sec * 1000)) * 1000) % 1000000;
+
+	return setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const void *)&tv, sizeof(tv));
 }
