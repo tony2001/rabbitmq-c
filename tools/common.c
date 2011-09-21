@@ -206,7 +206,7 @@ amqp_connection_state_t make_connection(void)
 			die("bad server port number in %s", amqp_server);
 	}
 
-	s = amqp_open_socket(host, port ? port : 5672);
+	s = amqp_open_socket(host, port ? port : 5672, 0);
 	die_amqp_error(s, "opening socket to %s", amqp_server);
 
 	conn = amqp_new_connection();

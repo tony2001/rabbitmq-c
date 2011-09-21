@@ -42,19 +42,55 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <poll.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 
 #include "amqp.h"
 #include "amqp_framing.h"
 #include "amqp_private.h"
 
+enum {
+	AMQP_POLL_SUCCESS,
+	AMQP_POLL_TIMEOUT,
+	AMQP_POLL_FAILURE
+}; 
+
+static int _amqp_poll(int sockfd, int op, int timeout, int *err) /* {{{ */
+{
+	struct pollfd fds[1];
+	int poll_res;
+
+	memset(&fds, 0, sizeof(struct pollfd));
+	fds[0].fd = sockfd;
+	fds[0].events = op | POLLERR;
+
+	errno = 0;
+	poll_res = poll(fds, 1, timeout);
+
+	switch (poll_res) {
+		case 0: /* timeout */
+			return AMQP_POLL_TIMEOUT;
+		case 1: /* success */
+			return AMQP_POLL_SUCCESS;
+	}
+	/* error */
+	if (err) {
+		*err = errno;
+	}
+	return AMQP_POLL_FAILURE;
+}
+/* }}} */ 
 
 int amqp_open_socket(char const *hostname,
-		     int portnumber)
+		     int portnumber, int timeout)
 {
   int sockfd, res;
   struct sockaddr_in addr;
   struct hostent *he;
   int one = 1; /* used as a buffer by setsockopt below */
+  int orig_flags;
 
   res = amqp_socket_init();
   if (res)
@@ -72,15 +108,84 @@ int amqp_open_socket(char const *hostname,
   if (sockfd == -1)
     return -amqp_socket_error();
 
-  if (amqp_socket_setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one,
-			     sizeof(one)) < 0
-      || connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+  if (timeout > 0) {
+	  orig_flags = fcntl(sockfd, F_GETFL,0);
+	  res = fcntl(sockfd, F_SETFL, orig_flags | O_NONBLOCK);
+	  if (res != 0) {
+		  amqp_socket_close(sockfd);
+		  return res;
+	  }
+  }
+
+  if (amqp_socket_setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) < 0)
   {
     res = -amqp_socket_error();
     amqp_socket_close(sockfd);
     return res;
   }
 
+  if (timeout <= 0) {
+	 if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		 res = -amqp_socket_error();
+		 amqp_socket_close(sockfd);
+		 return res;
+	 }
+	 return sockfd;
+  } else {
+	  int err = 0;
+		
+	  while (1) {
+		res = connect(sockfd, (struct sockaddr *) &addr, sizeof(addr));
+		
+		if (res == 0) {
+			/* success! */
+			break;
+		}
+
+		switch(errno) {
+			case EALREADY:
+			case EINPROGRESS:
+			{
+				res = _amqp_poll(sockfd, POLLOUT|POLLIN|POLLHUP|POLLERR, timeout, &err);
+				if (res == AMQP_POLL_SUCCESS) {
+					/* try again */
+					continue;
+				}
+
+				/* timeout exceeded or an error occured */
+				amqp_socket_close(sockfd);
+				goto out_loop;
+			}
+			case EINTR:
+				continue;
+			default:
+				res = errno;
+				amqp_socket_close(sockfd);
+				goto out_loop;
+		}
+	  }
+
+out_loop:
+
+	  if (res == AMQP_POLL_TIMEOUT) {
+		  amqp_socket_close(sockfd);
+		  return -ERROR_CONNECTION_TIMED_OUT;
+	  } else if (res == AMQP_POLL_FAILURE) {
+		  amqp_socket_close(sockfd);
+		  return -err | ERROR_CATEGORY_OS;
+	  }
+  }
+
+  if (timeout > 0) {
+	  int fd_flags;
+
+	  fd_flags = fcntl(sockfd, F_GETFL,0);
+	  res = fcntl(sockfd, F_SETFL, orig_flags);
+	  if (res != 0) {
+		  amqp_socket_close(sockfd);
+		  return res;
+	  }
+  }
   return sockfd;
 }
 

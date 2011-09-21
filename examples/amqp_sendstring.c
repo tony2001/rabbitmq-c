@@ -69,7 +69,7 @@ int main(int argc, char const * const *argv) {
 
   conn = amqp_new_connection();
 
-  die_on_error(sockfd = amqp_open_socket(hostname, port), "Opening socket");
+  die_on_error(sockfd = amqp_open_socket(hostname, port, 0), "Opening socket");
   amqp_set_sockfd(conn, sockfd);
   die_on_amqp_error(amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest"),
 		    "Logging in");

@@ -58,6 +58,7 @@ static const char *client_error_strings[ERROR_MAX] = {
   "unknown host", /* ERROR_GETHOSTBYNAME_FAILED */
   "incompatible AMQP version", /* ERROR_INCOMPATIBLE_AMQP_VERSION */
   "connection closed unexpectedly", /* ERROR_CONNECTION_CLOSED */
+  "connection timed out", /* ERROR_CONNECTION_TIMED_OUT */
 };
 
 char *amqp_error_string(int err)

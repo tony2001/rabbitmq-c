@@ -281,7 +281,7 @@ RABBITMQ_EXPORT int amqp_table_entry_cmp(void const *entry1,
 					 void const *entry2);
 
 RABBITMQ_EXPORT int amqp_open_socket(char const *hostname,
-				     int portnumber);
+					 int portnumber, int timeout);
 
 RABBITMQ_EXPORT int amqp_send_header(amqp_connection_state_t state);
 
