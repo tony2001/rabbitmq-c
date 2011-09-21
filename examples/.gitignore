@@ -1,0 +1,12 @@
+.libs
+.deps
+*.lo
+*.o
+amqp_bind
+amqp_consumer
+amqp_exchange_declare
+amqp_listen
+amqp_listenq
+amqp_producer
+amqp_sendstring
+amqp_unbind
